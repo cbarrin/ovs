@@ -13,6 +13,8 @@
  * limitations under the License. */
 
 #include <config.h>
+#include <stdlib.h>
+#include <time.h>
 
 #include "ofproto/ofproto-dpif-xlate.h"
 
@@ -1677,22 +1679,32 @@ group_first_live_bucket(const struct xlate_ctx *ctx,
     return NULL;
 }
 
+static bool is_srand_initialized = false;
+
 static struct ofputil_bucket *
 group_best_live_bucket(const struct xlate_ctx *ctx,
                        const struct group_dpif *group,
                        uint32_t basis)
 {
-    struct ofputil_bucket *best_bucket = NULL;
-    uint32_t best_score = 0;
+    struct ofputil_bucket *bucket = NULL;
+    uint32_t rand_num = 0;
+    uint32_t sum = 0;
 
+    // Initialize random seed once
+    if (!is_srand_initialized) {
+        srand(time(NULL));
+        is_srand_initialized = true;
+    }
+    
+    // Generate a random number from [1, 10]
+    rand_num = (rand() % 10) + 1;
+    
     struct ofputil_bucket *bucket;
     LIST_FOR_EACH (bucket, list_node, &group->up.buckets) {
         if (bucket_is_alive(ctx, bucket, 0)) {
-            uint32_t score =
-                (hash_int(bucket->bucket_id, basis) & 0xffff) * bucket->weight;
-            if (score >= best_score) {
-                best_bucket = bucket;
-                best_score = score;
+            sum += bucket->weight;
+            if (rand_num <= sum) {
+                return bucket;
             }
         }
     }
